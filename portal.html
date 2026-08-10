@@ -85,7 +85,6 @@
             flex-grow: 1;
             overflow-y: auto;
             padding: 20px;
-            /* Padding bawah diperbesar agar tombol keluar tidak tertutup */
             padding-bottom: 120px;
         }
 
@@ -257,10 +256,17 @@
                 <div class="section-title">Setup Data Sekolah & Pengguna</div>
                 
                 <div class="input-box-card">
-                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-dark); margin-bottom: 8px;">➕ Tambah Data Siswa & Unduh Berkas</div>
-                    <div class="form-row" style="margin-bottom: 12px;">
-                        <button class="btn-primary-custom" style="background: #0284c7; padding: 8px;" onclick="downloadDataSiswa(event)">Unduh Data Siswa 📥</button>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-dark); margin-bottom: 8px;">➕ Tambah Data Siswa & Berkas CSV</div>
+                    <div class="form-row" style="margin-bottom: 10px;">
+                        <button class="btn-primary-custom" style="background: #0284c7; padding: 8px;" onclick="downloadDataSiswa(event)">Unduh Data 📥</button>
                         <button class="btn-primary-custom" style="background: #64748b; padding: 8px;" onclick="downloadTemplateCsv(event)">Template Kosong 📄</button>
+                    </div>
+
+                    <!-- Tombol Unggah Berkas CSV -->
+                    <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed var(--border-light); margin-bottom: 12px;">
+                        <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark); display: block; margin-bottom: 4px;">📤 Unggah File Template Siswa (.csv):</label>
+                        <input type="file" id="csvFileUpload" accept=".csv" class="form-control" style="font-size: 0.7rem; margin-bottom: 6px; background: white;">
+                        <button class="btn-primary-custom" style="background: #059669; width: 100%; padding: 8px;" onclick="uploadAndProcessCsv(event)">Unggah & Proses Data 🚀</button>
                     </div>
 
                     <div class="form-row">
@@ -1038,6 +1044,73 @@
 
             alert(`🌟 Berhasil memberikan penghargaan ${starCount} Bintang kepada Wali Kelas (${todayStr})!`);
             renderKepsekTeacherAudit();
+        }
+
+        // --- FUNGSI UNGGAH & PROSES CSV OTOMATIS ---
+        function uploadAndProcessCsv(event) {
+            event.preventDefault();
+            const fileInput = document.getElementById('csvFileUpload');
+            const file = fileInput.files[0];
+
+            if(!file) {
+                alert("⚠️ Pilih file CSV terlebih dahulu menggunakan tombol Pilih File!");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                let addedCount = 0;
+
+                // Mulai dari baris 1 (lewati header baris 0)
+                for(let i = 1; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if(!line) continue;
+
+                    // Parse CSV dengan menangani tanda kutip
+                    let row = [];
+                    let inQuotes = false;
+                    let currentVal = '';
+                    for (let char of line) {
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            row.push(currentVal.trim().replace(/^["']|["']$/g, ''));
+                            currentVal = '';
+                        } else {
+                            currentVal += char;
+                        }
+                    }
+                    row.push(currentVal.trim().replace(/^["']|["']$/g, ''));
+
+                    if(row.length >= 3) {
+                        const nisn = row[0];
+                        const name = row[1];
+                        const kelas = row[2];
+                        const parentPhone = row[3] || '';
+
+                        if(nisn && name && kelas) {
+                            // Cek apakah NISN sudah ada agar tidak duplikat
+                            const exists = studentsList.some(s => s.nisn === nisn);
+                            if(!exists) {
+                                studentsList.push({ nisn, name, kelas, parentPhone });
+                                addedCount++;
+                            }
+                        }
+                    }
+                }
+
+                if(addedCount > 0) {
+                    saveToStorage();
+                    populateClassDropdowns();
+                    alert(`✅ Berhasil mengunggah dan menambahkan ${addedCount} data siswa baru ke sistem!`);
+                    fileInput.value = '';
+                } else {
+                    alert("⚠️ Tidak ada data valid yang dapat dibaca atau data siswa sudah terdaftar sebelumnya.");
+                }
+            };
+            reader.readAsText(file);
         }
 
         // --- ADMIN & STORAGE UTILS ---
